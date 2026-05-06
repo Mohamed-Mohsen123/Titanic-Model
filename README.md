@@ -553,3 +553,149 @@ Run all cells from top to bottom. Each step builds on the previous one.
 ├── titanic_dt.ipynb   # Main notebook — all code and explanations
 └── README.md          # This file
 ```
+
+---
+
+## 📐 Impurity, Gini & Entropy — Deep Dive
+
+---
+
+### What is Impurity?
+
+Before understanding Gini and Entropy, you need to understand what **impurity** means.
+
+Imagine a node in your Decision Tree contains a group of passengers. Impurity measures **how mixed that group is**:
+
+| Group | Survived | Not Survived | Impurity |
+|---|---|---|---|
+| All survived | 100% | 0% | 🟢 Zero — perfectly pure |
+| All didn't survive | 0% | 100% | 🟢 Zero — perfectly pure |
+| Half and half | 50% | 50% | 🔴 Maximum — totally mixed |
+
+> 💡 The goal of every split in a Decision Tree is to **reduce impurity** — to create child nodes that are more pure (less mixed) than their parent.
+
+When the tree asks "is the passenger male?", it's asking: *which question splits the group into the least mixed subgroups?*
+
+---
+
+### Gini Impurity
+
+**Gini impurity** measures the probability that a randomly chosen passenger from a node would be **incorrectly classified** if we randomly assigned it a label based on the class distribution in that node.
+
+#### Formula
+
+$$Gini = 1 - \sum_{i=1}^{C} p_i^2$$
+
+Where:
+- $C$ = number of classes (2 in our case: survived / not survived)
+- $p_i$ = proportion of samples belonging to class $i$
+
+#### Worked Example
+
+Say a node has **10 passengers: 7 didn't survive, 3 survived**
+
+$$p_{not} = \frac{7}{10} = 0.7, \quad p_{surv} = \frac{3}{10} = 0.3$$
+
+$$Gini = 1 - (0.7^2 + 0.3^2) = 1 - (0.49 + 0.09) = 1 - 0.58 = \mathbf{0.42}$$
+
+#### Gini Impurity Scale
+
+| Situation | Gini Value |
+|---|---|
+| Perfectly pure (all one class) | **0.0** |
+| Worst case (50/50 split, 2 classes) | **0.5** |
+| Higher = more mixed | — |
+
+#### How the Tree Uses It — Information Gain
+
+When deciding which feature to split on, the tree calculates the **weighted Gini after the split** and compares it to the Gini before:
+
+$$\text{Gain} = Gini_{parent} - \left(\frac{n_{left}}{n} \cdot Gini_{left} + \frac{n_{right}}{n} \cdot Gini_{right}\right)$$
+
+The split with the **highest gain** (biggest reduction in impurity) is chosen.
+
+---
+
+### Entropy & Information Gain
+
+**Entropy** comes from information theory. It measures the **amount of disorder or uncertainty** in a group. A perfectly pure group has zero uncertainty — you always know the answer. A 50/50 group has maximum uncertainty.
+
+#### Formula
+
+$$Entropy = -\sum_{i=1}^{C} p_i \cdot \log_2(p_i)$$
+
+Where:
+- $p_i$ = proportion of class $i$ in the node
+- $\log_2$ = logarithm base 2 (used because we're measuring in "bits" of information)
+
+> ⚠️ By convention, $0 \cdot \log_2(0) = 0$ — we treat this as zero to avoid undefined math.
+
+#### Worked Example
+
+Same node: **7 didn't survive, 3 survived**
+
+$$p_{not} = 0.7, \quad p_{surv} = 0.3$$
+
+$$Entropy = -(0.7 \cdot \log_2(0.7) + 0.3 \cdot \log_2(0.3))$$
+$$= -(0.7 \cdot (-0.515) + 0.3 \cdot (-1.737))$$
+$$= -(-0.361 + (-0.521))$$
+$$= \mathbf{0.882}$$
+
+#### Entropy Scale
+
+| Situation | Entropy Value |
+|---|---|
+| Perfectly pure (all one class) | **0.0** |
+| Worst case (50/50 split, 2 classes) | **1.0** |
+| Higher = more uncertain | — |
+
+#### Information Gain (how the tree uses entropy)
+
+$$\text{Information Gain} = Entropy_{parent} - \left(\frac{n_{left}}{n} \cdot Entropy_{left} + \frac{n_{right}}{n} \cdot Entropy_{right}\right)$$
+
+Same idea as Gini gain — the tree picks the split that gives the **highest information gain**.
+
+---
+
+### Side-by-Side Comparison
+
+| | **Gini** | **Entropy** |
+|---|---|---|
+| **Measures** | Probability of misclassification | Disorder / uncertainty |
+| **Range** | 0.0 → 0.5 (binary) | 0.0 → 1.0 (binary) |
+| **Pure node value** | 0.0 | 0.0 |
+| **Max impurity (50/50)** | 0.5 | 1.0 |
+| **Math used** | Squaring probabilities | Logarithms |
+| **Speed** | ⚡ Faster (no log) | 🐢 Slightly slower |
+| **Tends to** | Isolate the largest class | Create more balanced splits |
+| **In practice** | Nearly identical results | Nearly identical results |
+| **sklearn default** | ✅ Yes (`criterion='gini'`) | Optional (`criterion='entropy'`) |
+
+---
+
+### Visual Intuition — How Both Curves Look
+
+Both Gini and Entropy peak at 50/50 and drop to 0 at the extremes, but Entropy has a wider, taller curve:
+
+```
+Impurity
+  1.0 |          Entropy
+      |        ╱‾‾‾‾‾╲
+  0.5 |      ╱  Gini  ╲
+      |    ╱  ╱‾‾‾‾‾╲  ╲
+  0.0 |___╱____________╲___
+      0%   25%   50%   75%  100%
+           Proportion of class 1
+```
+
+Both reach their maximum at 50% (total uncertainty) and fall to 0 at 0% or 100% (pure node). Entropy is just more sensitive to intermediate values because of the logarithm.
+
+---
+
+### When to Use Which?
+
+In practice, the choice rarely changes the final model significantly. But here's a useful rule of thumb:
+
+> 🟦 Use **Gini** (default) — faster, and works well in most cases.
+>
+> 🟨 Use **Entropy** — if you suspect class imbalance or want to investigate whether more balanced splits improve your results. Always worth comparing both as done in this notebook.
